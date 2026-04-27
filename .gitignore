@@ -19,6 +19,9 @@ _ReSharper*/
 **/TestResults/
 *.pdb
 *.cache
+coverage/
+coverage.*
+**/*.trx
 
 # ASP.NET Core local dev settings
 WakeNetServer.Server/appsettings.Development.json
