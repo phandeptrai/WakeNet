@@ -42,5 +42,15 @@ jobs:
           dotnet build WakeNetServer.Server/WakeNetServer.Server.csproj -c Release --no-restore
           dotnet build WakeNetServer.Tests/WakeNetServer.Tests.csproj -c Release --no-restore
 
-      - name: Test
-        run: dotnet test WakeNetServer.Tests/WakeNetServer.Tests.csproj -c Release --no-build --verbosity normal
+      - name: List tests
+        run: dotnet test WakeNetServer.Tests/WakeNetServer.Tests.csproj -c Release --no-build --list-tests
+
+      - name: Run unit tests
+        run: dotnet test WakeNetServer.Tests/WakeNetServer.Tests.csproj -c Release --no-build --logger "trx;LogFileName=test-results.trx" --verbosity normal
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: "**/TestResults/*.trx"
