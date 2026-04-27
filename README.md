@@ -5,11 +5,9 @@
 - Node.js + npm
 
 ## Cấu hình môi trường
-Tạo file `.env` ở thư mục root (cùng cấp `WakeNet.sln`). Có thể copy từ `.env.example`.
-
-Các biến đang dùng:
-- `WAKENET_SQLITE_PATH`: đường dẫn file SQLite database.
-- `WAKENET_CORS_ORIGINS`: danh sách origin FE được phép gọi API (phân tách bởi `,` hoặc `;`).
+Chỉnh trong `WakeNetServer.Server/appsettings.json`:
+- `WakeNet:SqlitePath`: đường dẫn file SQLite database (có thể để relative).
+- `WakeNet:CorsOrigins`: danh sách origin FE được phép gọi API.
 
 ## Chạy Backend (WakeNetServer.Server)
 

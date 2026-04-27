@@ -1,15 +1,9 @@
 using WakeNetServer.Server.Repository.Sqlite;
-using WakeNetServer.Server.Utils;
 using WakeNetServer.Server.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-
-DotEnv.LoadNearest(
-    builder.Environment.ContentRootPath,
-    Directory.GetCurrentDirectory()
-);
 
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
@@ -24,12 +18,12 @@ builder.Services.AddSession(options =>
     options.IdleTimeout = TimeSpan.FromDays(7);
 });
 
-var corsOrigins = (Environment.GetEnvironmentVariable("WAKENET_CORS_ORIGINS") ?? string.Empty)
-    .Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
-    .Select(o => o.Trim())
-    .Where(o => o.Length > 0)
+var corsOrigins = builder.Configuration.GetSection("WakeNet:CorsOrigins").Get<string[]>() ?? Array.Empty<string>();
+corsOrigins = corsOrigins
+    .Select(o => o?.Trim())
+    .Where(o => !string.IsNullOrWhiteSpace(o))
     .Distinct(StringComparer.OrdinalIgnoreCase)
-    .ToArray();
+    .ToArray()!;
 
 builder.Services.AddCors(options =>
 {
@@ -49,7 +43,7 @@ builder.Services.AddCors(options =>
     });
 });
 
-builder.Services.AddSqliteRepositories();
+builder.Services.AddSqliteRepositories(builder.Configuration);
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
@@ -91,6 +85,23 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-app.MapFallbackToFile("/index.html");
+// Khi dev bằng Visual Studio, ưu tiên mở FE dev server (Vite) thay vì file tĩnh.
+if (app.Environment.IsDevelopment())
+{
+    var spaUrl = builder.Configuration["WakeNet:SpaDevServerUrl"];
+    if (!string.IsNullOrWhiteSpace(spaUrl))
+    {
+        app.MapGet("/", () => Results.Redirect(spaUrl));
+        app.MapFallback(() => Results.Redirect(spaUrl));
+    }
+    else
+    {
+        app.MapFallbackToFile("/index.html");
+    }
+}
+else
+{
+    app.MapFallbackToFile("/index.html");
+}
 
 app.Run();

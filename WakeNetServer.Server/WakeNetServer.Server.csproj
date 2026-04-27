@@ -6,7 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <SpaRoot>..\wakenetserver.client</SpaRoot>
     <SpaProxyLaunchCommand>npm run dev</SpaProxyLaunchCommand>
-    <SpaProxyServerUrl>https://localhost:61675</SpaProxyServerUrl>
+    <SpaProxyServerUrl>http://localhost:3172</SpaProxyServerUrl>
   </PropertyGroup>
 
   <ItemGroup>

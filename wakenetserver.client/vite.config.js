@@ -6,10 +6,11 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 3172,
+    strictPort: true,
     proxy: {
       '/api': {
-        // WakeNetServer.Server (launchSettings.json): http://localhost:5000
-        target: 'http://localhost:5000',
+        // Dùng HTTPS để tránh redirect từ UseHttpsRedirection()
+        target: 'https://localhost:5001',
         changeOrigin: true,
         secure: false,
       },
