@@ -51,3 +51,6 @@ WakeNetData/
 
 # ===== Cursor =====
 .cursor/
+
+# ===== GCP deploy local overrides =====
+Gcp-deploy/deploy.config.local.json

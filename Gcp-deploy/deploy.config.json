@@ -1,0 +1,21 @@
+{
+  "projectId": "wakenet-494615",
+  "region": "asia-southeast1",
+  "zone": "asia-southeast1-a",
+
+  "vmName": "wakenet-vm",
+  "machineType": "e2-standard-2",
+  "bootDiskGb": 30,
+
+  "networkTag": "wakenet-http",
+  "firewallRuleName": "allow-wakenet-http-https",
+
+  "artifactRegistryRegion": "asia-southeast1",
+  "artifactRepoName": "wakenet",
+  "imageName": "wakenet-server",
+  "imageTag": "latest",
+
+  "containerPort": 5000,
+  "publicPort": 80
+}
+
