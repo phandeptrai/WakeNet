@@ -82,6 +82,121 @@ Vì FE và BE được serve chung 1 app/container:
 - **Frontend**: `http://<EXTERNAL_IP>/`
 - **Backend API**: `http://<EXTERNAL_IP>/api/...`
 
+## Xoá deploy (KHÔNG xoá project)
+
+Tuỳ nhu cầu bạn có thể xoá theo nhiều mức độ dưới đây. Các lệnh này **chỉ xoá tài nguyên triển khai**, không đụng tới **GCP Project**.
+
+> `zone` lấy từ `deploy.config.json` (vd: `asia-southeast1-a`). Bạn có thể set biến để dùng cho các lệnh bên dưới:
+>
+> ```powershell
+> $ZONE = "asia-southeast1-a"
+> $VM_NAME = "wakenet-vm"
+> ```
+
+### 1) Chỉ gỡ app/container (giữ nguyên VM)
+SSH vào VM rồi stop/remove container đang chạy:
+
+```bash
+gcloud compute ssh wakenet-vm --zone <zone>
+sudo docker ps
+sudo docker ps -aq | xargs -r sudo docker rm -f
+```
+
+PowerShell (Windows) tương đương:
+
+```powershell
+gcloud compute ssh $VM_NAME --zone $ZONE
+sudo docker ps
+sudo docker ps -aq | xargs -r sudo docker rm -f
+```
+
+> Nếu bạn muốn giữ các container khác (không xoá hết), thay lệnh `rm -f ...` bằng tên container cụ thể.
+
+### 2) Xoá VM (server) (phổ biến nhất)
+Xoá VM sẽ dừng toàn bộ app. Lệnh này **không xoá project**.
+
+```bash
+gcloud compute instances delete wakenet-vm --zone <zone> --quiet
+```
+
+PowerShell (Windows) tương đương:
+
+```powershell
+gcloud compute instances delete $VM_NAME --zone $ZONE --quiet
+```
+
+#### Nếu xoá VM báo “was not found”
+Lỗi này nghĩa là VM **không tồn tại trong zone bạn nhập** (hoặc bạn đang trỏ nhầm project). Vì script deploy có thể fallback sang zone khác (`a/b/c/d`), hãy kiểm tra như sau.
+
+Kiểm tra project hiện tại:
+
+```powershell
+gcloud config get-value project
+```
+
+Nếu cần, set đúng project (đúng như `deploy.config.json`):
+
+```powershell
+gcloud config set project <projectId>
+```
+
+Tìm VM theo tên để biết **đúng zone**:
+
+```powershell
+gcloud compute instances list --filter="name=('wakenet-vm')" --format="table(name,zone,status,EXTERNAL_IP)"
+```
+
+Sau đó xoá theo zone tìm được:
+
+```powershell
+gcloud compute instances delete wakenet-vm --zone <ZONE_TIM_DUOC> --quiet
+```
+
+PowerShell “auto” (tự lấy zone theo tên VM):
+
+```powershell
+$ZONE_FOUND = gcloud compute instances list --filter="name=($VM_NAME)" --format="value(zone)" | Select-Object -First 1
+if (-not $ZONE_FOUND) { throw "Không tìm thấy VM '$VM_NAME' trong project hiện tại." }
+gcloud compute instances delete $VM_NAME --zone $ZONE_FOUND --quiet
+```
+
+Nếu không thấy VM nào, list toàn bộ VM trong project để kiểm tra tên:
+
+```powershell
+gcloud compute instances list --format="table(name,zone,status,EXTERNAL_IP)"
+```
+
+### 3) (Tuỳ chọn) Xoá firewall rule do deploy tạo
+Nếu bạn không dùng rule này nữa:
+
+```bash
+gcloud compute firewall-rules delete allow-wakenet-http-https --quiet
+```
+
+### 4) (Tuỳ chọn) Dọn Artifact Registry (image/repo)
+Nếu không cần giữ image nữa (giữ project nhưng dọn storage):
+
+Xem danh sách image:
+
+```bash
+gcloud artifacts docker images list <artifactRegistryRegion>-docker.pkg.dev/<projectId>/<artifactRepoName>
+```
+
+Xoá 1 image/tag cụ thể:
+
+```bash
+gcloud artifacts docker images delete \
+  <artifactRegistryRegion>-docker.pkg.dev/<projectId>/<artifactRepoName>/<imageName>:<imageTag> \
+  --quiet --delete-tags
+```
+
+Hoặc xoá luôn cả repo (xoá hết image bên trong):
+
+```bash
+gcloud artifacts repositories delete <artifactRepoName> \
+  --location <artifactRegistryRegion> --quiet
+```
+
 ## Cách VM chạy container (startup script)
 
 VM dùng metadata để chạy `startup.sh`:
