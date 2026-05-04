@@ -1,6 +1,0 @@
-@WakeNetServer.Server_HostAddress = http://localhost:5268
-
-GET {{WakeNetServer.Server_HostAddress}}/weatherforecast/
-Accept: application/json
-
-###

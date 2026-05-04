@@ -1,3 +1,18 @@
+.vs/
+**/bin/
+**/obj/
+*.user
+*.suo
+*.cache
+*.log
+*.db-shm
+*.db-wal
+*.vsidx
+*.dtbcache.v2
+
+# Windows service install artifacts (optional)
+WakeNetClient/Logs/
+
 # ===== OS / Editor =====
 .DS_Store
 Thumbs.db
