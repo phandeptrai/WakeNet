@@ -7,6 +7,11 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WakeNetServer", "WakeNetSer
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WakeNetClient", "WakeNetClient\WakeNetClient.csproj", "{A34DA1C9-900C-4C9F-8E12-EA0A4AC5BDBC}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "WakeNetShared", "WakeNetShared", "{A1B9C3D5-6E7F-4A2B-9C0D-1E2F3A4B5C6D}"
+	ProjectSection(SolutionItems) = preProject
+		WakeNetShared\WakeNet.AppSettings.shared.config = WakeNetShared\WakeNet.AppSettings.shared.config
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU

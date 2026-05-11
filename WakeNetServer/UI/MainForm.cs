@@ -1,7 +1,9 @@
 using System.ComponentModel;
+using System.Configuration;
 using System.Net;
 using WakeNetServer.Domain;
 using WakeNetServer.Networking;
+using WakeNetServer.Repositories;
 using WakeNetServer.Services;
 
 namespace WakeNetServer.UI;
@@ -18,12 +20,14 @@ public sealed class MainForm : Form
         public string Mac { get; set; } = "";
         public string Os { get; set; } = "";
         public DateTime LastSeenUtc { get; set; }
+        public bool IsConnected { get; set; }
 
-        public bool Online => DateTime.UtcNow - LastSeenUtc <= OnlineThreshold;
+        public bool Online => IsConnected && DateTime.UtcNow - LastSeenUtc <= OnlineThreshold;
         public DateTime LastSeenLocal => LastSeenUtc.ToLocalTime();
     }
 
     private readonly TcpJsonServer _server = new();
+    private readonly IClientRepository _clients;
     private readonly BindingList<ClientRow> _rows = new();
 
     private readonly DataGridView _grid = new()
@@ -45,10 +49,12 @@ public sealed class MainForm : Form
     private readonly Button _btnShutdown = new() { Text = "Shutdown", AutoSize = true };
     private readonly Button _btnRestart = new() { Text = "Restart", AutoSize = true };
     private readonly Button _btnWol = new() { Text = "WOL", AutoSize = true };
+    private readonly Button _btnDelete = new() { Text = "Delete", AutoSize = true };
     private readonly Label _lblStatus = new() { AutoSize = true };
 
-    public MainForm(User user)
+    public MainForm(User user, IClientRepository clients)
     {
+        _clients = clients;
         Text = "WakeNet";
         StartPosition = FormStartPosition.CenterParent;
         MinimumSize = new Size(980, 520);
@@ -78,9 +84,10 @@ public sealed class MainForm : Form
         _btnShutdown.Click += async (_, _) => await SendCommandAsync("shutdown");
         _btnRestart.Click += async (_, _) => await SendCommandAsync("restart");
         _btnWol.Click += async (_, _) => await SendWolAsync();
+        _btnDelete.Click += async (_, _) => await DeleteSelectedClientAsync();
 
         _server.ClientUpserted += session => BeginInvoke(new Action(() => UpsertRow(session)));
-        _server.ClientRemoved += clientId => BeginInvoke(new Action(() => RemoveRow(clientId)));
+        _server.ClientRemoved += clientId => BeginInvoke(new Action(() => MarkDisconnected(clientId)));
 
         FormClosing += (_, _) => { _ = StopListenerAsync(); };
 
@@ -110,6 +117,7 @@ public sealed class MainForm : Form
         topBar.Controls.Add(_btnShutdown);
         topBar.Controls.Add(_btnRestart);
         topBar.Controls.Add(_btnWol);
+        topBar.Controls.Add(_btnDelete);
         topBar.Controls.Add(new Label { Text = "  ", AutoSize = true });
         topBar.Controls.Add(_lblStatus);
 
@@ -132,6 +140,8 @@ public sealed class MainForm : Form
         panel.Controls.Add(btnLogout, 0, 3);
 
         Controls.Add(panel);
+
+        _ = LoadClientsFromDbAsync();
     }
 
     private void ConfigureGrid()
@@ -194,12 +204,18 @@ public sealed class MainForm : Form
             return;
         }
 
-        _rows.Clear();
-        _server.Start(IPAddress.Any, port, clientTimeout: TimeSpan.FromSeconds(30));
-        _lblStatus.Text = $"Listening 0.0.0.0:{port} (timeout 30s)";
+        var hostStr = (ConfigurationManager.AppSettings["ServerHost"] ?? "127.0.0.1").Trim();
+        if (!IPAddress.TryParse(hostStr, out var bindIp))
+        {
+            MessageBox.Show(this, $"ServerHost không hợp lệ: '{hostStr}'", "WakeNet", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        await LoadClientsFromDbAsync();
+        _server.Start(bindIp, port, clientTimeout: TimeSpan.FromSeconds(30));
+        _lblStatus.Text = $"Listening {bindIp}:{port} (timeout 30s)";
         _btnStart.Enabled = false;
         _btnStop.Enabled = true;
-        await Task.CompletedTask;
     }
 
     private async Task StopListenerAsync()
@@ -209,7 +225,13 @@ public sealed class MainForm : Form
         _lblStatus.Text = "Stopped";
         _btnStart.Enabled = true;
         _btnStop.Enabled = false;
-        _rows.Clear();
+
+        // Keep rows (persisted in DB); just mark all as offline.
+        for (var i = 0; i < _rows.Count; i++)
+        {
+            _rows[i].IsConnected = false;
+            _rows.ResetItem(i);
+        }
     }
 
     private string? GetSelectedClientId()
@@ -266,6 +288,8 @@ public sealed class MainForm : Form
 
     private void UpsertRow(ClientSession session)
     {
+        _ = Task.Run(() => _clients.UpsertAsync(session));
+
         var existing = _rows.FirstOrDefault(r => r.ClientId == session.ClientId);
         if (existing is null)
         {
@@ -276,7 +300,8 @@ public sealed class MainForm : Form
                 Ip = session.Ip,
                 Mac = session.Mac,
                 Os = session.Os,
-                LastSeenUtc = session.LastSeenUtc
+                LastSeenUtc = session.LastSeenUtc,
+                IsConnected = true
             });
         }
         else
@@ -286,6 +311,7 @@ public sealed class MainForm : Form
             existing.Mac = session.Mac;
             existing.Os = session.Os;
             existing.LastSeenUtc = session.LastSeenUtc;
+            existing.IsConnected = true;
 
             // Force grid refresh for BindingList objects.
             var idx = _rows.IndexOf(existing);
@@ -293,11 +319,98 @@ public sealed class MainForm : Form
         }
     }
 
-    private void RemoveRow(string clientId)
+    private async Task LoadClientsFromDbAsync()
+    {
+        try
+        {
+            var all = await _clients.GetAllAsync().ConfigureAwait(false);
+
+            if (InvokeRequired)
+            {
+                BeginInvoke(new Action(() => ApplyDbClients(all)));
+            }
+            else
+            {
+                ApplyDbClients(all);
+            }
+        }
+        catch
+        {
+            // ignore DB load errors in UI
+        }
+    }
+
+    private void ApplyDbClients(IReadOnlyList<ClientRecord> all)
+    {
+        foreach (var c in all)
+        {
+            var existing = _rows.FirstOrDefault(r => r.ClientId == c.ClientId);
+            if (existing is null)
+            {
+                _rows.Add(new ClientRow
+                {
+                    ClientId = c.ClientId,
+                    Hostname = c.Hostname,
+                    Ip = c.Ip,
+                    Mac = c.Mac,
+                    Os = c.Os,
+                    LastSeenUtc = c.LastSeenUtc,
+                    IsConnected = false
+                });
+                continue;
+            }
+
+            // Refresh persisted fields (in case they changed)
+            existing.Hostname = c.Hostname;
+            existing.Ip = c.Ip;
+            existing.Mac = c.Mac;
+            existing.Os = c.Os;
+            existing.LastSeenUtc = c.LastSeenUtc;
+
+            var idx = _rows.IndexOf(existing);
+            if (idx >= 0) _rows.ResetItem(idx);
+        }
+    }
+
+    private async Task DeleteSelectedClientAsync()
+    {
+        var clientId = GetSelectedClientId();
+        if (clientId is null)
+        {
+            MessageBox.Show(this, "Vui lòng chọn 1 client.", "WakeNet", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        var confirm = MessageBox.Show(
+            this,
+            "Xóa client này khỏi DB? (Chỉ xóa thủ công theo admin)",
+            "WakeNet",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Warning);
+
+        if (confirm != DialogResult.Yes) return;
+
+        try
+        {
+            await _clients.DeleteAsync(clientId);
+            var existing = _rows.FirstOrDefault(r => r.ClientId == clientId);
+            if (existing is not null) _rows.Remove(existing);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "WakeNet", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private void MarkDisconnected(string clientId)
     {
         var existing = _rows.FirstOrDefault(r => r.ClientId == clientId);
         if (existing is null) return;
-        _rows.Remove(existing);
+        existing.IsConnected = false;
+
+        // Force grid refresh for BindingList objects.
+        var idx = _rows.IndexOf(existing);
+        if (idx >= 0) _rows.ResetItem(idx);
     }
 }
 

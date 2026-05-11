@@ -12,12 +12,13 @@ internal static class Program
     {
         ApplicationConfiguration.Initialize();
 
-        using var db = new AppDb();
+        var db = new AppDb();
         db.Initialize();
 
         var userRepo = new SqliteUserRepository(db);
         var authService = new AuthService(userRepo);
+        var clientRepo = new SqliteClientRepository(db);
 
-        Application.Run(new LoginForm(authService));
+        Application.Run(new LoginForm(authService, clientRepo));
     }
 }

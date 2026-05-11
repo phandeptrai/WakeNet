@@ -1,4 +1,5 @@
 using WakeNetServer.Domain;
+using WakeNetServer.Repositories;
 using WakeNetServer.Services;
 
 namespace WakeNetServer.UI;
@@ -6,6 +7,7 @@ namespace WakeNetServer.UI;
 public sealed class LoginForm : Form
 {
     private readonly AuthService _auth;
+    private readonly IClientRepository _clients;
 
     private readonly TextBox _txtUsername = new() { PlaceholderText = "Username" };
     private readonly TextBox _txtPassword = new() { PlaceholderText = "Password", UseSystemPasswordChar = true };
@@ -13,9 +15,10 @@ public sealed class LoginForm : Form
     private readonly LinkLabel _lnkRegister = new() { Text = "Chưa có tài khoản? Đăng ký" };
     private readonly Label _lblStatus = new() { AutoSize = true };
 
-    public LoginForm(AuthService auth)
+    public LoginForm(AuthService auth, IClientRepository clients)
     {
         _auth = auth;
+        _clients = clients;
 
         Text = "WakeNet - Đăng nhập";
         StartPosition = FormStartPosition.CenterScreen;
@@ -89,7 +92,7 @@ public sealed class LoginForm : Form
     private void OpenMain(User user)
     {
         Hide();
-        using var main = new MainForm(user);
+        using var main = new MainForm(user, _clients);
         main.ShowDialog(this);
         Show();
 

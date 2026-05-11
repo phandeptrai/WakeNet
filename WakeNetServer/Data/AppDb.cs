@@ -39,6 +39,16 @@ public sealed class AppDb : IDisposable
                 PasswordIterations INTEGER NOT NULL,
                 CreatedAtUtc TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS Clients (
+                ClientId TEXT PRIMARY KEY,
+                Hostname TEXT NOT NULL,
+                Ip TEXT NOT NULL,
+                Mac TEXT NOT NULL,
+                Os TEXT NOT NULL,
+                FirstSeenUtc TEXT NOT NULL,
+                LastSeenUtc TEXT NOT NULL
+            );
             """;
         cmd.ExecuteNonQuery();
     }
